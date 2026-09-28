@@ -1,0 +1,308 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+
+-- SETTINGS
+local settings = {
+    enabled = true,
+    ping = true,
+    fps = true,
+    players = true,
+    playTime = true,
+    hanoi = true,
+    rgb = true,
+    rgbSpeed = 0.15,
+    antiAfk = true
+}
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "ServerInfoRGB"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- INFO
+local infoFrame = Instance.new("Frame")
+infoFrame.Size = UDim2.fromOffset(220, 135)
+infoFrame.Position = UDim2.new(1, -230, 0, 10)
+infoFrame.BackgroundTransparency = 1
+infoFrame.Parent = gui
+
+local text = Instance.new("TextLabel")
+text.Size = UDim2.fromScale(1, 1)
+text.BackgroundTransparency = 1
+text.TextColor3 = Color3.new(1, 1, 1)
+text.TextSize = 16
+text.Font = Enum.Font.Code
+text.TextXAlignment = Enum.TextXAlignment.Left
+text.TextYAlignment = Enum.TextYAlignment.Top
+text.Parent = infoFrame
+
+-- CONTROL PANEL
+local panel = Instance.new("Frame")
+panel.Size = UDim2.fromOffset(240, 390)
+panel.Position = UDim2.fromOffset(20, 100)
+panel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+panel.BackgroundTransparency = 0.15
+panel.BorderSizePixel = 0
+panel.Active = true
+panel.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = panel
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundTransparency = 1
+title.Text = "SERVER INFO"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextSize = 20
+title.Font = Enum.Font.Code
+title.Parent = panel
+
+-- BUTTON FUNCTION
+local buttons = {}
+
+local function button(name, y, key)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, -20, 0, 32)
+    b.Position = UDim2.fromOffset(10, y)
+    b.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    b.BorderSizePixel = 0
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.TextSize = 15
+    b.Font = Enum.Font.Code
+    b.Parent = panel
+
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = b
+
+    local function update()
+        b.Text = name .. ": " .. (settings[key] and "ON" or "OFF")
+    end
+
+    b.MouseButton1Click:Connect(function()
+        settings[key] = not settings[key]
+        update()
+
+        if key == "antiAfk" then
+            setAntiAFK(settings.antiAfk)
+        end
+    end)
+
+    update()
+    buttons[key] = b
+
+    return b
+end
+
+-- ANTI AFK
+local antiAfkConnection
+
+function setAntiAFK(enabled)
+    if antiAfkConnection then
+        antiAfkConnection:Disconnect()
+        antiAfkConnection = nil
+    end
+
+    if enabled then
+        antiAfkConnection = player.Idled:Connect(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    end
+end
+
+-- BUTTONS
+button("MASTER", 45, "enabled")
+button("PING", 82, "ping")
+button("FPS", 119, "fps")
+button("PLAYERS", 156, "players")
+button("PLAY TIME", 193, "playTime")
+button("HANOI TIME", 230, "hanoi")
+button("RGB", 267, "rgb")
+button("ANTI-AFK", 304, "antiAfk")
+
+-- RGB SPEED
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(1, -20, 0, 32)
+speedBox.Position = UDim2.fromOffset(10, 341)
+speedBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+speedBox.BorderSizePixel = 0
+speedBox.TextColor3 = Color3.new(1, 1, 1)
+speedBox.PlaceholderColor3 = Color3.fromRGB(180, 180, 180)
+speedBox.TextSize = 15
+speedBox.Font = Enum.Font.Code
+speedBox.Text = tostring(settings.rgbSpeed)
+speedBox.PlaceholderText = "RGB Speed"
+speedBox.Parent = panel
+
+local speedCorner = Instance.new("UICorner")
+speedCorner.CornerRadius = UDim.new(0, 6)
+speedCorner.Parent = speedBox
+
+speedBox.FocusLost:Connect(function()
+    local n = tonumber(speedBox.Text)
+
+    if n then
+        settings.rgbSpeed = math.clamp(n, 0.01, 10)
+    end
+
+    speedBox.Text = tostring(settings.rgbSpeed)
+end)
+
+-- DRAG PANEL
+local dragging = false
+local dragStart
+local startPos
+
+panel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = true
+        dragStart = input.Position
+        startPos = panel.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (
+        input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch
+    ) then
+
+        local delta = input.Position - dragStart
+
+        local target = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+
+        TweenService:Create(
+            panel,
+            TweenInfo.new(0.04),
+            {Position = target}
+        ):Play()
+    end
+end)
+
+-- FPS
+local frames = 0
+local fps = 0
+local lastFPS = os.clock()
+
+RunService.RenderStepped:Connect(function()
+    frames += 1
+
+    local now = os.clock()
+
+    if now - lastFPS >= 1 then
+        fps = frames
+        frames = 0
+        lastFPS = now
+    end
+end)
+
+-- PLAY TIME
+local joinTime = os.clock()
+
+local function formatTime(seconds)
+    seconds = math.floor(seconds)
+
+    local h = math.floor(seconds / 3600)
+    local m = math.floor((seconds % 3600) / 60)
+    local s = seconds % 60
+
+    return string.format("%02d:%02d:%02d", h, m, s)
+end
+
+-- HANOI TIME
+local function getHanoiTime()
+    return os.date("!%H:%M:%S", os.time() + 7 * 60 * 60)
+end
+
+-- RGB 24-BIT
+local hue = 0
+
+RunService.RenderStepped:Connect(function(dt)
+    if settings.rgb then
+        hue = (hue + dt * settings.rgbSpeed) % 1
+        text.TextColor3 = Color3.fromHSV(hue, 1, 1)
+    else
+        text.TextColor3 = Color3.new(1, 1, 1)
+    end
+end)
+
+-- UPDATE INFO
+task.spawn(function()
+    while task.wait(0.2) do
+
+        if not settings.enabled then
+            infoFrame.Visible = false
+            continue
+        end
+
+        infoFrame.Visible = true
+
+        local lines = {}
+
+        if settings.ping then
+            local ping = 0
+
+            pcall(function()
+                ping = math.floor(
+                    Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+                )
+            end)
+
+            table.insert(lines, "PING    : " .. ping .. " ms")
+        end
+
+        if settings.fps then
+            table.insert(lines, "FPS     : " .. fps)
+        end
+
+        if settings.players then
+            table.insert(
+                lines,
+                "PLAYERS : " .. #Players:GetPlayers()
+            )
+        end
+
+        if settings.playTime then
+            table.insert(
+                lines,
+                "TIME    : " .. formatTime(os.clock() - joinTime)
+            )
+        end
+
+        if settings.hanoi then
+            table.insert(
+                lines,
+                "HANOI   : " .. getHanoiTime()
+            )
+        end
+
+        text.Text = table.concat(lines, "\n")
+    end
+end)
+
+-- START ANTI AFK
+setAntiAFK(true)
